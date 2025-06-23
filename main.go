@@ -9,17 +9,19 @@ import (
 )
 
 func main() {
-	//проверяем существует ли бд
-	//создаем новую или подключаемся к уже существующей
+	// Проверяем существует ли бд
+	// Создаем новую или подключаемся к уже существующей
 	dbFile := "scheduler.db"
-	db := db.Init(dbFile)
-	if db != nil {
-		panic(db)
+	err := db.Init(dbFile)
+	defer db.DB.Close()
+
+	if err != nil {
+		panic(err)
 	}
 
-	fmt.Println("Server is starting")
-	err := server.Run()
-	if err != nil {
-		log.Fatalf("Server not running: %v", err)
+	fmt.Println("Запуск сервера")
+	errServ := server.Run()
+	if errServ != nil {
+		log.Fatalf("Сервер не запущен: %v", errServ)
 	}
 }

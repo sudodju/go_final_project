@@ -41,7 +41,7 @@ func Init(dbFile string) error {
 		// Создаем БД
 		_, err := DB.Exec(schema)
 		if err != nil {
-			return fmt.Errorf("Ошибка создания схемы БД: %v", err)
+			return fmt.Errorf("Ошибка создания БД: %v", err)
 		}
 	}
 	return nil
