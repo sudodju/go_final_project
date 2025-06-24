@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -9,6 +10,44 @@ import (
 
 const dateFormat = "20060102"
 
+// Обработчик /api/nextdate
+func nextDayHandler(res http.ResponseWriter, req *http.Request) {
+
+	// Обработка параметров
+	dstart := req.FormValue("date")
+	repeat := req.FormValue("repeat")
+	now := req.FormValue("now")
+
+	var realNow time.Time
+	var err error
+	if now == "" {
+		realNow = time.Now()
+	} else {
+		realNow, err = time.Parse(dateFormat, now)
+		if err != nil {
+			http.Error(res, "Ошибка time.Parse для параметра now", http.StatusBadRequest)
+			return
+		}
+	}
+
+	if dstart == "" || repeat == "" {
+		http.Error(res, "Параметры date и repeat не могут быть пустыми", http.StatusBadRequest)
+		return
+	}
+
+	nextDate, err := NextDate(realNow, dstart, repeat)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusOK)
+	res.Write([]byte(nextDate))
+
+}
+
+// Функция вычисления следующей даты для таски по заданному правилу
 func NextDate(now time.Time, dstart string, repeat string) (string, error) {
 	if repeat == "" {
 		return "", fmt.Errorf("Правило повтора задачи отсутствует")
