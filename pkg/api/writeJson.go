@@ -6,12 +6,13 @@ import (
 )
 
 func writeJson(res http.ResponseWriter, data any) {
-	resp, err := json.Marshal(data)
-	if err != nil {
-		http.Error(res, "Ошибка кодирования ответа в json", http.StatusBadRequest)
-		return
-	}
 	res.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	res.WriteHeader(http.StatusOK)
-	res.Write(resp)
+	json.NewEncoder(res).Encode(data)
+}
+
+func writeJsonError(res http.ResponseWriter, err error, code int) {
+	res.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	res.WriteHeader(code)
+	json.NewEncoder(res).Encode(map[string]string{"error": err.Error()})
 }

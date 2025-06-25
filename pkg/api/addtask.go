@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,7 +9,7 @@ import (
 	"github.com/sudodju/go_final_project/pkg/db"
 )
 
-// Проверка правильности формата даты
+// Функция проверки правильности формата даты
 func checkDate(task *db.Task) (time.Time, error) {
 	var t time.Time
 	var err error
@@ -23,83 +22,55 @@ func checkDate(task *db.Task) (time.Time, error) {
 func addTaskHandler(res http.ResponseWriter, req *http.Request) {
 
 	if req.Method != http.MethodPost {
-		http.Error(res, "Некорректный метод для добавления задачи", http.StatusBadRequest)
+		writeJsonError(res, fmt.Errorf("Некорректный метод для добавления задачи"), http.StatusBadRequest)
 		return
 	}
 
 	var task db.Task
-	var buf bytes.Buffer
 
-	// читаем тело запроса
-	_, err := buf.ReadFrom(req.Body)
-	if err != nil {
-		http.Error(res, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// десериализуем json в task
-	if err = json.Unmarshal(buf.Bytes(), &task); err != nil {
-		http.Error(res, err.Error(), http.StatusBadRequest)
+	// читаем тело запроса в task
+	decode := json.NewDecoder(req.Body)
+	if err := decode.Decode(&task); err != nil {
+		writeJsonError(res, fmt.Errorf("Ошибка "), http.StatusBadRequest)
 		return
 	}
 
 	// проверка поля title
 	if task.Title == "" {
-		http.Error(res, "Поле Title не может быть пустым", http.StatusBadRequest)
+		writeJsonError(res, fmt.Errorf("Поле title не может быть пустым"), http.StatusBadRequest)
 		return
 	}
 
 	// проверка даты и правильности формата
-	if task.Date != "" {
+	now := time.Now()
+	if task.Date == "" || task.Date == now.Format(dateFormat) {
+		task.Date = now.Format(dateFormat)
+	} else {
 		t, err := checkDate(&task)
 		if err != nil {
-			http.Error(res, err.Error(), http.StatusBadRequest)
+			writeJsonError(res, err, http.StatusBadRequest)
 			return
 		}
-		// проверяем больше ли время t чем время now
-		if t.Before(time.Now()) {
-			// если задача одноразовая, присваиваем текущее время now
-			if task.Repeat == "" {
-				task.Date = time.Now().Format(dateFormat)
-				// если правило повтора repeat имеется, вычисляем следующую дату для таски и присваиваем время полю Date
-			} else {
-				next, err := NextDate(time.Now(), task.Date, task.Repeat)
-				if err != nil {
-					http.Error(res, err.Error(), http.StatusBadRequest)
-					return
-				}
-				task.Date = next
+
+		if task.Repeat != "" {
+			next, err := NextDate(time.Now(), task.Date, task.Repeat)
+			if err != nil {
+				writeJsonError(res, err, http.StatusBadRequest)
+				return
 			}
+			task.Date = next
+		} else if t.Before(now) {
+			// если повторения нет и дата в прошлом, ставим сегодняшнюю
+			task.Date = now.Format(dateFormat)
 		}
 	}
+
+	// добавляем таску в бд
 	id, err := db.AddTask(&task)
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusBadRequest)
+		writeJsonError(res, err, http.StatusBadRequest)
 		return
 	}
-	writeJson(res, id)
+	// возвращаем id таски в json
+	writeJson(res, map[string]string{"id": fmt.Sprint(id)})
 }
-
-/*
-		 var band string
-
-	    // берем название группы из параметра `band`
-	    band = r.URL.Query().Get("band")
-
-	    // Проверяем POST-запрос или нет
-	    if r.Method == http.MethodPost {
-	        var artist Artist
-	        var buf bytes.Buffer
-	        // читаем тело запроса
-	        _, err := buf.ReadFrom(r.Body)
-	        if err != nil {
-	            http.Error(w, err.Error(), http.StatusBadRequest)
-	            return
-	        }
-	        // десериализуем JSON в Artist
-	        if err = json.Unmarshal(buf.Bytes(), &artist); err != nil {
-	            http.Error(w, err.Error(), http.StatusBadRequest)
-	            return
-	        }
-	        artists[band] = artist
-	    } */
