@@ -7,6 +7,7 @@ import (
 func Init() {
 	http.HandleFunc("/api/nextdate", nextDayHandler)
 	http.HandleFunc("/api/task", taskHandler)
+	http.HandleFunc("/api/tasks", tasksHandler)
 }
 
 func taskHandler(res http.ResponseWriter, req *http.Request) {
