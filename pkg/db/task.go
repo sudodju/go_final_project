@@ -1,6 +1,9 @@
 package db
 
-import "fmt"
+import (
+	"database/sql"
+	"fmt"
+)
 
 type Task struct {
 	ID      string `json:"id,omitempty"`
@@ -46,4 +49,39 @@ func Tasks(limit int) ([]*Task, error) {
 		tasks = []*Task{}
 	}
 	return tasks, nil
+}
+
+func GetTask(id string) (*Task, error) {
+	query := "SELECT id, date, title, comment, repeat FROM scheduler WHERE id = ?"
+
+	row := DB.QueryRow(query, id)
+
+	var task Task
+
+	err := row.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("Не найдена запись с таким id: %v", err)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("Не удалось извлечь данные по заданному id: %v", err)
+	}
+	return &task, nil
+}
+
+func UpdateTask(task *Task) error {
+	query := `UPDATE scheduler SET date = ?, title = ?, comment = ?, repeat = ? WHERE id = ?`
+	res, err := DB.Exec(query, &task.Date, &task.Title, &task.Comment, &task.Repeat, &task.ID)
+	if err != nil {
+		return err
+	}
+
+	count, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if count == 0 {
+		return fmt.Errorf("Некорректный id для редактирования задачи")
+	}
+	return nil
 }

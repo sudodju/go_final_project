@@ -9,21 +9,29 @@ import (
 	"github.com/sudodju/go_final_project/pkg/db"
 )
 
-// Функция проверки правильности формата даты
-func checkDate(task *db.Task) (time.Time, error) {
-	var t time.Time
-	var err error
-	if t, err = time.Parse(dateFormat, task.Date); err != nil {
-		return t, fmt.Errorf("Неверно указан формат даты: %v", err)
+func getTaskHandler(res http.ResponseWriter, req *http.Request) {
+
+	if req.Method != http.MethodGet {
+		writeJsonError(res, fmt.Errorf("Некорректный метод, требуется GET"), http.StatusMethodNotAllowed)
 	}
-	return t, nil
+
+	id := req.URL.Query().Get("id")
+
+	if id == "" {
+		writeJsonError(res, fmt.Errorf("Не указан идентификатор"), http.StatusBadRequest)
+		return
+	}
+
+	task, err := db.GetTask(id)
+	if err != nil {
+		writeJsonError(res, err, http.StatusBadRequest)
+	}
+	writeJson(res, task)
 }
 
-func addTaskHandler(res http.ResponseWriter, req *http.Request) {
-
-	if req.Method != http.MethodPost {
-		writeJsonError(res, fmt.Errorf("Некорректный метод для добавления задачи"), http.StatusMethodNotAllowed)
-		return
+func updateTaskHandler(res http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPut {
+		writeJsonError(res, fmt.Errorf("Некорректный метод, требуется GET"), http.StatusMethodNotAllowed)
 	}
 
 	var task db.Task
@@ -65,12 +73,11 @@ func addTaskHandler(res http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	// добавляем таску в бд
-	id, err := db.AddTask(&task)
+	// Обновляем таску в бд
+	err := db.UpdateTask(&task)
 	if err != nil {
 		writeJsonError(res, err, http.StatusBadRequest)
 		return
 	}
-	// возвращаем id таски в json
-	writeJson(res, map[string]string{"id": fmt.Sprint(id)})
+	writeJson(res, map[string]string{})
 }
