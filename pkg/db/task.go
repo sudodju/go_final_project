@@ -85,3 +85,42 @@ func UpdateTask(task *Task) error {
 	}
 	return nil
 }
+
+func UpdateDate(id, next string) error {
+	query := `UPDATE scheduler SET date = ? WHERE id = ?`
+	res, err := DB.Exec(query, next, id)
+	if err != nil {
+		return fmt.Errorf("Ошибка при обновлении даты задачи по заданному id: %v", err)
+	}
+
+	count, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if count == 0 {
+		return fmt.Errorf("Не удалось обновить дату задачи с указанным id: %v", err)
+	}
+
+	return nil
+}
+
+func DeleteTask(id string) error {
+	query := `DELETE FROM scheduler WHERE id = ?`
+
+	res, err := DB.Exec(query, id)
+	if err != nil {
+		return fmt.Errorf("Ошибка при удалении задачи: %v", err)
+	}
+
+	count, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if count == 0 {
+		return fmt.Errorf("Задача с заданным id не найдена: %v", err)
+	}
+
+	return nil
+}

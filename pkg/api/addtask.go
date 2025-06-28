@@ -22,7 +22,7 @@ func checkDate(task *db.Task) (time.Time, error) {
 func addTaskHandler(res http.ResponseWriter, req *http.Request) {
 
 	if req.Method != http.MethodPost {
-		writeJsonError(res, fmt.Errorf("Некорректный метод для добавления задачи"), http.StatusMethodNotAllowed)
+		writeJsonError(res, fmt.Errorf("Некорректный метод, требуется POST"), http.StatusMethodNotAllowed)
 		return
 	}
 

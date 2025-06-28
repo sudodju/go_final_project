@@ -8,6 +8,7 @@ func Init() {
 	http.HandleFunc("/api/nextdate", nextDayHandler)
 	http.HandleFunc("/api/task", taskHandler)
 	http.HandleFunc("/api/tasks", tasksHandler)
+	http.HandleFunc("/api/task/done", checkMarkHandler)
 }
 
 func taskHandler(res http.ResponseWriter, req *http.Request) {
@@ -18,5 +19,8 @@ func taskHandler(res http.ResponseWriter, req *http.Request) {
 		getTaskHandler(res, req)
 	case http.MethodPut:
 		updateTaskHandler(res, req)
+	case http.MethodDelete:
+		deleteTaskHandler(res, req)
 	}
+
 }

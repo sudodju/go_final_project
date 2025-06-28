@@ -10,6 +10,7 @@ type TasksResp struct {
 	Tasks []*db.Task `json:"tasks"`
 }
 
+// Получаем список ближайших задач
 func tasksHandler(res http.ResponseWriter, req *http.Request) {
 	tasks, err := db.Tasks(10)
 	if err != nil {

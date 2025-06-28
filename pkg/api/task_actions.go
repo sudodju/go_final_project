@@ -13,6 +13,7 @@ func getTaskHandler(res http.ResponseWriter, req *http.Request) {
 
 	if req.Method != http.MethodGet {
 		writeJsonError(res, fmt.Errorf("Некорректный метод, требуется GET"), http.StatusMethodNotAllowed)
+		return
 	}
 
 	id := req.URL.Query().Get("id")
@@ -25,13 +26,15 @@ func getTaskHandler(res http.ResponseWriter, req *http.Request) {
 	task, err := db.GetTask(id)
 	if err != nil {
 		writeJsonError(res, err, http.StatusBadRequest)
+		return
 	}
 	writeJson(res, task)
 }
 
 func updateTaskHandler(res http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPut {
-		writeJsonError(res, fmt.Errorf("Некорректный метод, требуется GET"), http.StatusMethodNotAllowed)
+		writeJsonError(res, fmt.Errorf("Некорректный метод, требуется PUT"), http.StatusMethodNotAllowed)
+		return
 	}
 
 	var task db.Task
@@ -80,4 +83,68 @@ func updateTaskHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	writeJson(res, map[string]string{})
+}
+
+func deleteTaskHandler(res http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodDelete {
+		writeJsonError(res, fmt.Errorf("Некорректный метод, требуется DELETE"), http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := req.URL.Query().Get("id")
+	if id == "" {
+		writeJsonError(res, fmt.Errorf("Не указан id"), http.StatusBadRequest)
+		return
+	}
+
+	err := db.DeleteTask(id)
+	if err != nil {
+		writeJsonError(res, err, http.StatusBadRequest)
+		return
+	}
+
+	writeJson(res, map[string]string{})
+}
+
+func checkMarkHandler(res http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		writeJsonError(res, fmt.Errorf("Некорректный метод, требуется POST"), http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := req.URL.Query().Get("id")
+	if id == "" {
+		writeJsonError(res, fmt.Errorf("Не указан id"), http.StatusBadRequest)
+		return
+	}
+
+	task, err := db.GetTask(id)
+
+	if err != nil {
+		writeJsonError(res, err, http.StatusBadRequest)
+		return
+	}
+
+	if len(task.Repeat) == 0 {
+		err := db.DeleteTask(id)
+		if err != nil {
+			writeJsonError(res, err, http.StatusBadRequest)
+			return
+		}
+		writeJson(res, map[string]string{})
+
+	} else {
+		date, err := NextDate(time.Now(), task.Date, task.Repeat)
+		if err != nil {
+			writeJsonError(res, err, http.StatusBadRequest)
+			return
+		}
+
+		err = db.UpdateDate(id, date)
+		if err != nil {
+			writeJsonError(res, err, http.StatusBadRequest)
+			return
+		}
+		writeJson(res, map[string]string{})
+	}
 }
