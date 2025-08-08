@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go1f/pkg/server"
 	"log"
+	"os"
 
 	"github.com/sudodju/go_final_project/pkg/db"
 )
@@ -11,7 +12,11 @@ import (
 func main() {
 	// Проверяем существует ли бд
 	// Создаем новую или подключаемся к уже существующей
-	dbFile := "scheduler.db"
+	dbFile, ok := os.LookupEnv("TODO_DBFILE")
+	if !ok || dbFile == "" {
+		fmt.Println("Переменной окружения TODO_DBFILE не существует, scheduler.db будет создана в текущей директории")
+		dbFile = "scheduler.db"
+	}
 	err := db.Init(dbFile)
 	defer db.DB.Close()
 
