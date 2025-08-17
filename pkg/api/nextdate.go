@@ -49,6 +49,7 @@ func nextDayHandler(res http.ResponseWriter, req *http.Request) {
 
 // Функция вычисления следующей даты для таски по заданному правилу
 func NextDate(now time.Time, dstart string, repeat string) (string, error) {
+
 	if repeat == "" {
 		return "", fmt.Errorf("Правило повтора задачи отсутствует")
 	}
@@ -96,7 +97,47 @@ func NextDate(now time.Time, dstart string, repeat string) (string, error) {
 		res := date.Format(dateFormat)
 		return res, nil
 
+	case "w":
+		if len(rule) == 0 {
+			return "", fmt.Errorf("Правило 'w' не может быть пустым, необходимо 1-7")
+		}
+		// получаем день недели из dstart
+		start, _ := time.Parse(dateFormat, dstart)
+		currentDay := int(start.Weekday())
+		// убираем первый элемент из rule, который должен быть 'w '
+		daysPart := strings.TrimPrefix(repeat, "w ")
+		// разбиваем оставшуюся часть на дни недели
+		ruleDays := strings.Split(daysPart, ",")
+		// оставляем только дни недели, без 'w '
+
+		if currentDay == 0 {
+			currentDay = 7 // если сегодня воскресенье, то считаем его 7-м днем
+		}
+
+		var interval int
+		minInterval := 8
+		// ищем ближайший день недели из ruleDays
+		for _, day := range ruleDays {
+			dayInt, err := strconv.Atoi(day)
+			if err != nil {
+				return "", fmt.Errorf("Ошибка преобразования дня недели '%s' в int: %v", day, err)
+			}
+			if dayInt < 1 || dayInt > 7 {
+				return "", fmt.Errorf("Некорректный день недели '%d'. Должен быть от 1 до 7", dayInt)
+			}
+			// вычисляем интервал до ближайшего дня недели
+			interval = (dayInt - currentDay + 7) % 7
+			if interval == 0 {
+				interval = 7
+			}
+			if interval < minInterval {
+				minInterval = interval
+			}
+		}
+		res := date.AddDate(0, 0, minInterval).Format(dateFormat)
+		return res, nil
+
 	default:
-		return "", fmt.Errorf("Неверный формат '%c' в repeat. Требуется 'd' или 'y'", repeat[0])
+		return "", fmt.Errorf("Неверный формат '%c' в repeat. Требуется 'd' или 'y' или 'w' или 'm'", repeat[0])
 	}
 }
