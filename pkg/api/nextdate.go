@@ -10,6 +10,9 @@ import (
 
 const dateFormat = "20060102"
 
+var monthDays [32]bool
+var month [13]bool
+
 // Обработчик /api/nextdate
 func nextDayHandler(res http.ResponseWriter, req *http.Request) {
 
@@ -98,7 +101,7 @@ func NextDate(now time.Time, dstart string, repeat string) (string, error) {
 		return res, nil
 
 	case "w":
-		if len(rule) == 0 {
+		if len(rule) == 1 {
 			return "", fmt.Errorf("Правило 'w' не может быть пустым, необходимо 1-7")
 		}
 		// получаем день недели из dstart
@@ -135,6 +138,56 @@ func NextDate(now time.Time, dstart string, repeat string) (string, error) {
 			}
 		}
 		res := date.AddDate(0, 0, minInterval).Format(dateFormat)
+		return res, nil
+
+	case "m":
+		if len(rule) == 1 {
+			return "", fmt.Errorf("Правило 'm' не может быть пустым, необходимо 1-31")
+		}
+		// парсиm dstart
+		start, _ := time.Parse(dateFormat, dstart)
+		// получаем текущий месяц
+		// отделяем ненужный префикс 'm '
+		delPref := strings.TrimPrefix(repeat, "m ")
+		// [0] - нужные дни для повтора, [1] - лежат нужные месяцы
+		sliceDaysMonths := strings.Split(delPref, " ")
+		// в days получили нужные дни для повтора
+		days := strings.Split(sliceDaysMonths[0], ",")
+
+		// в months получили нужные месяцы для повтора
+		for _, day := range days {
+			dayInt, _ := strconv.Atoi(day)
+			for i := range monthDays {
+				if i == dayInt {
+					monthDays[i] = true
+				}
+			}
+		}
+		// получили максимальную цифру итераций
+		nextMonth := time.Date(start.Year(), start.Month()+1, 1, 0, 0, 0, 0, start.Location())
+		lastDayOfMonth := nextMonth.AddDate(0, 0, -1).Day()
+
+		minInterval := 32
+		var interval int
+		for i := 1; i <= lastDayOfMonth; i++ {
+			if monthDays[i] == true {
+				currentDay := start.Day()
+				interval = (i - currentDay + lastDayOfMonth) % lastDayOfMonth
+				if interval == 0 {
+					interval = lastDayOfMonth
+				}
+				if interval < minInterval {
+					minInterval = interval
+				}
+			}
+		}
+
+		for i := range monthDays {
+			monthDays[i] = false // сбрасываем массив для следующего использования
+		}
+
+		date = date.AddDate(0, 0, minInterval)
+		res := date.Format(dateFormat)
 		return res, nil
 
 	default:
