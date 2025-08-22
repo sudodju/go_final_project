@@ -10,9 +10,6 @@ import (
 
 const dateFormat = "20060102"
 
-var monthDays [32]bool
-var month [13]bool
-
 // Обработчик /api/nextdate
 func nextDayHandler(res http.ResponseWriter, req *http.Request) {
 
@@ -105,7 +102,10 @@ func NextDate(now time.Time, dstart string, repeat string) (string, error) {
 			return "", fmt.Errorf("Правило 'w' не может быть пустым, необходимо 1-7")
 		}
 		// получаем день недели из dstart
-		start, _ := time.Parse(dateFormat, dstart)
+		start, err := time.Parse(dateFormat, dstart)
+		if err != nil {
+			return "", fmt.Errorf("Ошибка преобразования dstart в time.Time")
+		}
 		currentDay := int(start.Weekday())
 		// убираем первый элемент из rule, который должен быть 'w '
 		daysPart := strings.TrimPrefix(repeat, "w ")
@@ -114,7 +114,7 @@ func NextDate(now time.Time, dstart string, repeat string) (string, error) {
 		// оставляем только дни недели, без 'w '
 
 		if currentDay == 0 {
-			currentDay = 7 // если сегодня воскресенье, то считаем его 7-м днем
+			currentDay = 7 // если сегодня воскресенье, то считаем его 7м днем
 		}
 
 		var interval int
@@ -137,16 +137,33 @@ func NextDate(now time.Time, dstart string, repeat string) (string, error) {
 				minInterval = interval
 			}
 		}
-		res := date.AddDate(0, 0, minInterval).Format(dateFormat)
+
+		resDate := date.AddDate(0, 0, minInterval)
+
+		// проверяем, что дата после now, а не в прошлом
+		if !resDate.After(now) {
+			for {
+				resDate = resDate.AddDate(0, 0, 7)
+				if resDate.After(now) {
+					break
+				}
+			}
+		}
+
+		res := resDate.Format(dateFormat)
 		return res, nil
 
 	case "m":
+		var months [13]bool
+
 		if len(rule) == 1 {
-			return "", fmt.Errorf("Правило 'm' не может быть пустым, необходимо 1-31")
+			return "", fmt.Errorf("Правило 'm' не может быть пустым, необходимо -2:31")
 		}
 		// парсиm dstart
-		start, _ := time.Parse(dateFormat, dstart)
-		// получаем текущий месяц
+		start, err := time.Parse(dateFormat, dstart)
+		if err != nil {
+			return "", fmt.Errorf("Ошибка преобразования dstart в time.Time")
+		}
 		// отделяем ненужный префикс 'm '
 		delPref := strings.TrimPrefix(repeat, "m ")
 		// [0] - нужные дни для повтора, [1] - лежат нужные месяцы
@@ -154,42 +171,86 @@ func NextDate(now time.Time, dstart string, repeat string) (string, error) {
 		// в days получили нужные дни для повтора
 		days := strings.Split(sliceDaysMonths[0], ",")
 
-		// в months получили нужные месяцы для повтора
+		// Если в repeat указаны месяцы, то получаем слайс trueMonth с нужными месяцами
+		var trueMonth []string
+		if len(sliceDaysMonths) > 1 {
+			trueMonth = strings.Split(sliceDaysMonths[1], ",")
+		}
+
+		// Заполняем месяцы
+		for _, m := range trueMonth {
+			mInt, err := strconv.Atoi(m)
+			if err != nil {
+				return "", fmt.Errorf("Ошибка преобразования string '%s' в int: %v", m, err)
+			}
+			if mInt < 1 || mInt > 12 {
+				return "", fmt.Errorf("Месяц должен быть от 1 до 12")
+			}
+			months[mInt] = true
+		}
+
+		// Проверяем, что дни лежат в допустимых значениях
 		for _, day := range days {
-			dayInt, _ := strconv.Atoi(day)
-			for i := range monthDays {
-				if i == dayInt {
-					monthDays[i] = true
-				}
+			dayInt, err := strconv.Atoi(day)
+			if err != nil {
+				return "", fmt.Errorf("Ошибка преобразования string '%s' в int: %v", day, err)
 			}
-		}
-		// получили максимальную цифру итераций
-		nextMonth := time.Date(start.Year(), start.Month()+1, 1, 0, 0, 0, 0, start.Location())
-		lastDayOfMonth := nextMonth.AddDate(0, 0, -1).Day()
-
-		minInterval := 32
-		var interval int
-		for i := 1; i <= lastDayOfMonth; i++ {
-			if monthDays[i] == true {
-				currentDay := start.Day()
-				interval = (i - currentDay + lastDayOfMonth) % lastDayOfMonth
-				if interval == 0 {
-					interval = lastDayOfMonth
-				}
-				if interval < minInterval {
-					minInterval = interval
-				}
+			if dayInt != -1 && dayInt != -2 && (dayInt < 1 || dayInt > 31) {
+				return "", fmt.Errorf("День должен быть от 1 до 31, -1(Последний день месяца), -2(Предпоследний день месяца)")
 			}
 		}
 
-		for i := range monthDays {
-			monthDays[i] = false // сбрасываем массив для следующего использования
+		// Если месяцы не указаны, используем все месяцы
+		if len(trueMonth) == 0 {
+			for i := 1; i <= 12; i++ {
+				months[i] = true
+			}
 		}
 
-		date = date.AddDate(0, 0, minInterval)
-		res := date.Format(dateFormat)
-		return res, nil
+		// Основной цикл поиска
+		for range 999999 {
+			// ищем дату добавляя по 1 дню
+			start = start.AddDate(0, 0, 1)
 
+			// Если дата в прошлом
+			if !start.After(now) {
+				continue
+			}
+			// Проверяем, подходит ли месяц
+			if !months[int(start.Month())] {
+				continue
+			}
+
+			// Вычисляем последний и предпоследний день месяца
+			nextMonth := time.Date(start.Year(), start.Month()+1, 1, 0, 0, 0, 0, start.Location())
+			lastDay := nextMonth.AddDate(0, 0, -1).Day()
+			prevLastDay := nextMonth.AddDate(0, 0, -2).Day()
+
+			currentDay := start.Day()
+
+			// Проверяем, подходит ли текущий день
+			for _, day := range days {
+				dayInt, err := strconv.Atoi(day)
+				if err != nil {
+					return "", fmt.Errorf("Ошибка преобразования string '%s' в int: %v", day, err)
+				}
+				switch dayInt {
+				case -1:
+					if currentDay == lastDay {
+						return start.Format(dateFormat), nil
+					}
+				case -2:
+					if currentDay == prevLastDay {
+						return start.Format(dateFormat), nil
+					}
+				default:
+					if dayInt >= 1 && dayInt <= 31 && currentDay == dayInt {
+						return start.Format(dateFormat), nil
+					}
+				}
+			}
+		}
+		return "", fmt.Errorf("Не удалось найти следующую дату для правила 'm'")
 	default:
 		return "", fmt.Errorf("Неверный формат '%c' в repeat. Требуется 'd' или 'y' или 'w' или 'm'", repeat[0])
 	}
