@@ -17,7 +17,28 @@ const schema = `CREATE TABLE scheduler (
 				comment TEXT NOT NULL DEFAULT "",
 				repeat VARCHAR(128) NOT NULL DEFAULT ""
 				);
-				CREATE INDEX task_date ON scheduler (date);`
+				CREATE INDEX task_date ON scheduler (date);
+
+				--Создаем виртуальную таблицу FTS5 для searchBar
+				CREATE VIRTUAL TABLE scheduler_fts USING fts5 (
+				title, comment,
+				content='scheduler',
+				content_rowid='id'
+				);
+
+				--Создаем триггеры для fts таблицы
+				CREATE TRIGGER scheduler_ai AFTER INSERT ON scheduler BEGIN
+				INSERT INTO scheduler_fts(rowid, title, comment) VALUES (new.id, new.title, new.comment);
+				END;
+
+				CREATE TRIGGER scheduler_au AFTER UPDATE ON scheduler BEGIN
+				INSERT INTO scheduler_fts(scheduler_fts, rowid, title, comment) VALUES('delete', old.id, old.title, old.comment);
+				INSERT INTO scheduler_fts(rowid, title, comment) VALUES (new.id, new.title, new.comment);
+				END;
+
+				CREATE TRIGGER scheduler_ad AFTER DELETE ON scheduler BEGIN
+				INSERT INTO scheduler_fts(scheduler_fts, rowid, title, comment) VALUES('delete', old.id, old.title, old.comment);
+				END;`
 
 func Init(dbFile string) error {
 	// Проверяем существует ли файл с именем dbFile("scheduler.db")
