@@ -124,3 +124,39 @@ func DeleteTask(id string) error {
 
 	return nil
 }
+
+func SearchBarGetTasks(search string) ([]*Task, error) {
+	// Создаем паттерн поиска FTS5 "ба*" найдет "бассейн"
+	searchPattern := search + "*"
+
+	rows, err := DB.Query(`
+        SELECT s.id, s.date, s.title, s.comment, s.repeat 
+        FROM scheduler s 
+        JOIN scheduler_fts fts ON s.id = fts.rowid 
+        WHERE scheduler_fts MATCH ? 
+        ORDER BY s.date`, searchPattern)
+
+	if err != nil {
+		return nil, fmt.Errorf("Ошибка запроса SELECT к FTS: %v", err)
+	}
+	defer rows.Close()
+
+	var tasks []*Task
+	for rows.Next() {
+		var task Task
+		err := rows.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+		if err != nil {
+			return nil, fmt.Errorf("Ошибка при сканировании: %v", err)
+		}
+		tasks = append(tasks, &task)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if tasks == nil {
+		tasks = []*Task{}
+	}
+	return tasks, nil
+}
